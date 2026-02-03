@@ -1,0 +1,89 @@
+##################################
+# Streamlit configuration file  #
+##################################
+
+[global]
+# dataFrameSerialization = "arrow"
+
+[logger]
+# level = "info"
+# messageFormat = "%(asctime)s %(message)s"
+
+[client]
+# caching = true
+# displayEnabled = true
+# showErrorDetails = true
+
+[runner]
+# magicEnabled = true
+# installTracer = false
+# fixMatplotlib = true
+
+[server]
+enableStaticServing = true
+# folderWatchBlacklist = []
+# fileWatcherType = "auto"
+# cookieSecret = "your-cookie-secret"
+# headless = false
+# enableCORS = true
+# enableXsrfProtection = true
+# maxUploadSize = 200
+# maxMessageSize = 200
+# enableWebsocketCompression = false
+# port = 8501
+# address = "localhost"
+# baseUrlPath = ""
+# runOnSave = false
+
+[browser]
+# serverAddress = "localhost"
+# serverPort = 8501
+# gatherUsageStats = true
+
+[mapbox]
+# token = ""
+
+[deprecation]
+# showfileUploaderEncoding = true
+# showPyplotGlobalUse = true
+
+[[theme.fontFaces]]
+url = "app/static/Bricolage.ttf"
+family = "Bricolage"
+weight = "100 900"
+
+[theme]
+base = "light"
+primaryColor = "#0e355e"
+# backgroundColor =
+# secondaryBackgroundColor =
+# textColor =
+# linkColor =
+# linkUnderline =
+# codeBackgroundColor =
+font = "Bricolage"
+baseFontSize = 15
+# baseFontWeight =
+headingFont = "Bricolage"
+# headingFontSizes =
+# headingFontWeights =
+# codeFont =
+# codeFontSize =
+# codeFontWeight =
+# baseRadius =
+# buttonRadius =
+# borderColor =
+# dataframeBorderColor =
+dataframeHeaderBackgroundColor = "#FFFF"
+# showWidgetBorder =
+# showSidebarBorder =
+# chartCategoricalColors =
+# chartSequentialColors =
+
+[theme.sidebar]
+primaryColor = "#0e355e"
+backgroundColor = "#c4ddf7"
+# secondaryBackgroundColor =
+# textColor =
+# linkColor =
+# linkUnderline =
