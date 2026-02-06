@@ -39,7 +39,7 @@ st.markdown(
 dfBanco = pd.read_csv("dataBase/banco.csv", sep=";", decimal=",")
 dfEstudo = pd.read_csv("dataBase/estudo.csv", sep=";", decimal=",")
 dfBudget = pd.read_csv("dataBase/budget.csv", sep=";", decimal=",")
-listaProjetos = dfEstudo["PROJETO"].dropna().unique()
+listaProjetos = dfEstudo["PROJETO"].dropna().sort_values().unique()
 listaItem = dfBanco["ITEM"].dropna().unique()
 
 dfEstudo["VALOR TOTAL"] = dfEstudo["VALOR UN."] * dfEstudo["QTD."]
@@ -82,6 +82,8 @@ with tab1:
         key="projetos_selecionados"
     )
 
+    edits = {}
+
     for projeto in projetosMultiselect:
         st.markdown(f"### {projeto}")
 
@@ -92,8 +94,12 @@ with tab1:
         
         
 
-        dfEditado = st.data_editor(df_view, width="stretch",
-                    column_config={
+        edits[projeto] = st.data_editor(
+            df_view,
+            num_rows="delete",
+            key=f"editor_{projeto}",
+            disabled=["", "VALOR TOTAL", "VALOR UN."],
+                                column_config={
                         "VALOR UN.": st.column_config.NumberColumn(
                             "VALOR UN.",
                             format="R$ %.2f",
@@ -103,8 +109,8 @@ with tab1:
                             format="R$ %.2f",
                         ),
                     },
-                    disabled=["", "VALOR TOTAL", "VALOR UN."],
-                    )
+        )
+
         total_projeto = df_view["VALOR TOTAL"].sum()
         st.markdown(f"📊 **TOTAL:** R$ {total_projeto: .2f}".replace(".",","))
         st.markdown(f"💵 **BUGDET:** R$ {budget_valor: .2f}".replace(".",","))
@@ -117,10 +123,26 @@ with tab1:
 
     if len(projetosMultiselect) is not 0:
         if st.button(":material/save: Salvar Alterações", type="primary"):
-            dfEstudo.update(dfEditado)
-            dfEstudo.to_csv("dataBase/estudo.csv", sep=";", decimal=",", index=False)
+
+            df_final = dfEstudo.copy()
+
+            for projeto, df_editado in edits.items():
+
+                # Remove todas as linhas antigas do projeto
+                df_final = df_final[df_final["PROJETO"] != projeto]
+
+                # Adiciona as novas (já com deletes aplicados)
+                df_final = pd.concat([df_final, df_editado], ignore_index=True)
+
+            df_final.to_csv(
+                "dataBase/estudo.csv",
+                sep=";",
+                decimal=",",
+                index=False
+            )
+
+            st.toast("Alterações salvas!", icon=":material/check:")
             st.rerun()
-            st.toast("Alterações salvas com sucesso!", icon=":material/check:")
 
 with tab2:
     with st.container(horizontal=True):

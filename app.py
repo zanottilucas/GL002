@@ -9,7 +9,7 @@ with st.sidebar:
     pages = {
         "NAVEGAÇÃO": [
             st.Page("pages/estudo.py", title="Estudo", icon=":material/book:"),
-            st.Page("pages/projetos.py", title="Projetos", icon=":material/folder:"),
+            #st.Page("pages/projetos.py", title="Projetos", icon=":material/folder:"),
         ]
     }
 
