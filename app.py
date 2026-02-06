@@ -2,8 +2,9 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
+logo = "assets/logo.png"
 with st.sidebar:
-    # st.logo(largeLogo, icon_image=smallLogo)
+    st.logo(logo, icon_image=logo)
 
     pages = {
         "NAVEGAÇÃO": [
