@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from functions import orcamento, banco
+from functions import adicionarItem, orcamento, banco
 
 st.markdown(
     """
@@ -39,6 +39,8 @@ st.markdown(
 dfBanco = pd.read_csv("dataBase/banco.csv", sep=";", decimal=",")
 dfEstudo = pd.read_csv("dataBase/estudo.csv", sep=";", decimal=",")
 dfBudget = pd.read_csv("dataBase/budget.csv", sep=";", decimal=",")
+listaProjetos = dfEstudo["PROJETO"].dropna().unique()
+listaItem = dfBanco["ITEM"].dropna().unique()
 
 dfEstudo["VALOR TOTAL"] = dfEstudo["VALOR UN."] * dfEstudo["QTD."]
 
@@ -63,13 +65,19 @@ tab1, tab2 = st.tabs([":material/book: Estudos", ":material/add: Adicionar"])
 
 with tab1:
     st.metric("Total do Projeto", f"R$ {total_projeto:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    with st.popover(":material/box: Total por Item"):
-        total_por_item = dfEstudo.groupby("ITEM")["QTD."].sum().sort_values(ascending=False)
-        st.table(total_por_item)
+
+    with st.container(horizontal=True):
+        if st.button(":material/add: Adicionar Item", type="primary"):
+            adicionarItem(listaProjetos, listaItem, dfBanco, dfEstudo)
+
+        with st.popover(":material/box: Total por Item"):
+            total_por_item = dfEstudo.groupby("ITEM")["QTD."].sum().sort_values(ascending=False)
+            st.table(total_por_item)
+        
 
     projetosMultiselect = st.multiselect(
         "",
-        dfEstudo["PROJETO"].dropna().unique(),
+        listaProjetos,
         placeholder="Selecione o Projeto",
         key="projetos_selecionados"
     )
