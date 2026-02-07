@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from functions import adicionarItem, orcamento, banco
+from functions import adicionarItem, orcamento, banco, gerar_pdf
 
 st.markdown(
     """
@@ -74,6 +74,7 @@ with tab1:
             total_por_item = dfEstudo.groupby("ITEM")["QTD."].sum().sort_values(ascending=False)
             st.table(total_por_item)
         
+        # Aqui abaixo começa a lista suspensa para filtrar o df Estudos
 
     projetosMultiselect = st.multiselect(
         "",
@@ -150,3 +151,13 @@ with tab2:
             orcamento(df_budget, dfBudget)
         if st.button(":material/database: Banco"):
             banco(dfBanco)
+        if st.button("Gerar PDF"):
+            pdf_bytes = gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget)
+
+            st.download_button(
+            label="Baixar PDF",
+            data=pdf_bytes,
+            file_name="relatorio.pdf",
+            mime="application/pdf"
+        )
+            st.pdf(pdf_bytes)

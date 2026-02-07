@@ -1,5 +1,20 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
+from datetime import datetime
+from babel.dates import format_date
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    LongTable,
+    PageBreak
+)
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import TableStyle
+from reportlab.lib import colors
+
 
 @st.dialog(":material/payments: Orçamento")
 def orcamento(df_budget, dfBudget):
@@ -62,3 +77,168 @@ def adicionarItem(listaProjetos, listaItem, dfBanco, dfEstudo):
         dfEstudo.to_csv("dataBase/estudo.csv", sep=";", decimal=",", index=False)
         st.rerun()
         st.success("Item adicionado com sucesso!")
+
+# -----------------------------
+# CAPA (desenhada via canvas)
+# -----------------------------
+def primeira_pagina(canvas, doc):
+    capa_relatorio = "assets/capa_relatorio.png"
+    w, h = A4
+
+    data = datetime.now()
+    formatada = format_date(data, "d 'de' MMMM 'de' y", locale="pt_BR")
+
+    canvas.drawImage(capa_relatorio, 0, 0, width=w, height=h)
+    canvas.setFont("Helvetica", 20)
+    canvas.drawString(45, 550, formatada)
+
+
+# -----------------------------
+# HEADER / FOOTER opcional
+# (páginas seguintes)
+# -----------------------------
+def outras_paginas(canvas, doc):
+    canvas.setFont("Helvetica", 9)
+    canvas.drawString(40, 20, f"Página {doc.page}")
+
+
+# -----------------------------
+# GERAR PDF
+# -----------------------------
+def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=40,
+        bottomMargin=40
+    )
+
+    styles = getSampleStyleSheet()
+
+    story = []
+
+    # 👇 Garante que a capa fique sozinha
+    story.append(PageBreak())
+
+    # -------- Conteúdo automático --------
+    story.append(Paragraph("Relatório de Dados", styles["Heading1"]))
+    story.append(Spacer(1, 12))
+
+    story.append(Paragraph(f"Total do projeto: R$ {total_projeto: .2f}".replace(".",","), styles["Heading1"]))
+
+    ordem_colunas = [
+    "PROJETO",
+    "LOCALIZAÇÃO",
+    "ITEM",
+    "QTD.",
+    "VALOR UN.",
+    "VALOR TOTAL"
+]
+
+ 
+    for projeto in listaProjetos:
+ 
+
+        df_view = dfEstudo[dfEstudo["PROJETO"] == projeto][ordem_colunas]
+        total_projeto = df_view["VALOR TOTAL"].sum()
+        df_view["VALOR UN."] = df_view["VALOR UN."].map(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        df_view["VALOR TOTAL"] = df_view["VALOR TOTAL"].map(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+        df_view_budget = df_budget[df_budget["PROJETO"] == projeto].to_dict(orient="list")
+        budget_valor = float(df_view_budget["BUDGET"][0])
+
+        story.append(Paragraph(f"{projeto}", styles["Heading2"]))
+        story.append(Paragraph(f"Total do Projeto: R${total_projeto: .2f}".replace(",", "X").replace(".", ",").replace("X", "."), styles["Heading4"]))
+        story.append(Paragraph(f"Budget: R${budget_valor: .2f}".replace(",", "X").replace(".", ",").replace("X", "."), styles["Heading4"]))
+        
+        diff = budget_valor - total_projeto
+
+        if diff < 0:
+            texto = f'OVER: <font color="red">R$ {diff: .2f}</font>'.replace(",", "X").replace(".", ",").replace("X", ".")   
+        else:
+            texto = f'SAVE: <font color="green">R${diff: .2f}</font>'.replace(",", "X").replace(".", ",").replace("X", ".")
+
+        story.append(Paragraph(texto, styles["Heading4"]))
+
+        # ---- converter dataframe ----
+        dados = df_view.values.tolist()
+
+        # ---- montar tabela ----
+        colunas = [ordem_colunas] + dados
+        
+        style = getSampleStyleSheet()["BodyText"]
+
+        dados_formatados = [
+            [Paragraph(str(c), style) for c in linha]
+            for linha in dados
+        ]
+
+        colunas = [ordem_colunas] + dados_formatados
+
+
+        tabela = LongTable(
+            colunas,
+            repeatRows=1
+        )
+
+        tabela.setStyle(TableStyle([
+
+            # Linhas
+            ("GRID", (0,0), (-1,-1), 0.25, colors.black),
+
+            # Cabeçalho
+            ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+
+            # Padding
+            ("LEFTPADDING", (0,0), (-1,-1), 4),
+            ("RIGHTPADDING", (0,0), (-1,-1), 4),
+            ("TOPPADDING", (0,0), (-1,-1), 2),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 2),
+        ]))
+
+        story.append(tabela)
+
+    # Aqui vem a tabela de total por item
+
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("Total por item", styles["Heading1"]))
+    story.append(Spacer(1, 12))
+
+    total_por_item = (
+        dfEstudo
+        .groupby("ITEM")["QTD."]
+        .sum()
+        .sort_values(ascending=False)
+        .reset_index()
+    )
+
+
+    dados = total_por_item.values.tolist()
+    colunas = [total_por_item.columns.tolist()] + dados
+
+    tabela = LongTable(colunas, repeatRows=1)
+
+    tabela.setStyle(TableStyle([
+        ("GRID", (0,0), (-1,-1), 0.25, colors.black),
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("ALIGN", (-1,1), (-1,-1), "RIGHT"),
+    ]))
+
+    story.append(tabela)
+
+    # build do documento
+    doc.build(
+        story,
+        onFirstPage=primeira_pagina,
+        onLaterPages=outras_paginas
+    )
+
+    buffer.seek(0)
+    return buffer.getvalue()
