@@ -152,6 +152,7 @@ with tab2:
         if st.button(":material/database: Banco"):
             banco(dfBanco)
         if st.button("Gerar PDF"):
+
             pdf_bytes = gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget)
 
             st.download_button(

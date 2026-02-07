@@ -8,12 +8,19 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
     LongTable,
-    PageBreak
+    PageBreak,
+    Image
 )
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import TableStyle
 from reportlab.lib import colors
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+import matplotlib
+import matplotlib as mpl
 
 
 @st.dialog(":material/payments: Orçamento")
@@ -129,7 +136,7 @@ def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
     story.append(Paragraph("Relatório de Dados", styles["Heading1"]))
     story.append(Spacer(1, 12))
 
-    story.append(Paragraph(f"Total do projeto: R$ {total_projeto: .2f}".replace(".",","), styles["Heading1"]))
+    #story.append(Paragraph(f"Total do projeto: R$ {total_projeto: .2f}".replace(".",","), styles["Heading1"])) --> Tem um Bug, quando tem um multiselect na outra aba, ele soma errado.
 
     ordem_colunas = [
     "PROJETO",
@@ -142,7 +149,6 @@ def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
 
  
     for projeto in listaProjetos:
- 
 
         df_view = dfEstudo[dfEstudo["PROJETO"] == projeto][ordem_colunas]
         total_projeto = df_view["VALOR TOTAL"].sum()
@@ -233,6 +239,62 @@ def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
 
     story.append(tabela)
 
+    # Aqui vem o gráfico de heat
+
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("Distribuição de Itens por Projeto", styles["Heading1"]))
+    story.append(Spacer(1, 12))
+
+    # ---- cria matriz pivot ----
+    pivot = dfEstudo.pivot_table(
+        index="PROJETO",
+        columns="ITEM",
+        values="QTD.",
+        aggfunc="sum",
+        fill_value=0
+    )
+
+    projetos = pivot.index.tolist()
+    itens = pivot.columns.tolist()
+    matrix = pivot.values
+
+
+    # ---- gera heatmap ----
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    im = ax.imshow(matrix)
+
+    # Barra de cor com label
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label("Quantidade (QTD.)")
+
+    ax.set_xticks(range(len(itens)))
+    ax.set_xticklabels(itens, rotation=45, ha="right")
+
+    ax.set_yticks(range(len(projetos)))
+    ax.set_yticklabels(projetos)
+
+    # valores nas células
+    for i in range(len(projetos)):
+        for j in range(len(itens)):
+            ax.text(j, i, int(matrix[i, j]),
+                    ha="center", va="center")
+
+    ax.set_title("Quantidade por Item e Projeto")
+
+    fig.tight_layout()
+
+
+    # ---- converte para imagem reportlab ----
+    img_buffer = BytesIO()
+    fig.savefig(img_buffer, format="png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    img_buffer.seek(0)
+
+    img = Image(img_buffer, width=480, height=300)
+
+    story.append(img)
+
     # build do documento
     doc.build(
         story,
@@ -241,4 +303,5 @@ def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
     )
 
     buffer.seek(0)
+
     return buffer.getvalue()
