@@ -71,6 +71,10 @@ def adicionarItem(listaProjetos, listaItem, dfBanco, dfEstudo):
     obs = st.text_area("Observação")
 
     if st.button("Adicionar"):
+
+        if not obs or obs.strip() == "":
+            obs = "Sem observação"
+
         novo_item = {
             "LOCALIZAÇÃO": localizacao,
             "PROJETO": projeto,
@@ -78,8 +82,9 @@ def adicionarItem(listaProjetos, listaItem, dfBanco, dfEstudo):
             "FORNECEDOR": fornecedor,
             "VALOR UN.": valor_un,
             "QTD.": qtd,
-            "OBS.": obs
+            "OBS": obs
         }
+
         dfEstudo.loc[len(dfEstudo)] = novo_item
         dfEstudo.to_csv("dataBase/estudo.csv", sep=";", decimal=",", index=False)
         st.rerun()
@@ -92,12 +97,16 @@ def primeira_pagina(canvas, doc):
     capa_relatorio = "assets/capa_relatorio.png"
     w, h = A4
 
+    dfTitulo = pd.read_csv("dataBase/nomeEstudo.csv", sep=";")
+    titulo = dfTitulo["NOME DO ESTUDO"].to_list()
+
     data = datetime.now()
     formatada = format_date(data, "d 'de' MMMM 'de' y", locale="pt_BR")
 
     canvas.drawImage(capa_relatorio, 0, 0, width=w, height=h)
     canvas.setFont("Helvetica", 20)
-    canvas.drawString(45, 550, formatada)
+    canvas.drawString(45, 550, titulo[0])
+    canvas.drawString(45, 500, formatada)
 
 
 # -----------------------------
@@ -305,3 +314,14 @@ def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
     buffer.seek(0)
 
     return buffer.getvalue()
+
+@st.dialog(":material/settings: Configuração")
+def mudar_titulo(titulo, dfTitulo):
+    mudarTitulo = st.text_input("Título", placeholder= titulo[0])
+
+    if st.button(":material/refresh: Atualizar", type="primary"):
+        dfTitulo.loc[0] = mudarTitulo
+        dfTitulo.to_csv("dataBase/nomeEstudo.csv", index=False, sep=";")
+        st.rerun()
+        st.success("Alteração feita com sucesso!")
+
