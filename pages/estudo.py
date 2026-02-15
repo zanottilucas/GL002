@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
-from functions import adicionarItem, orcamento, banco, gerar_pdf, mudar_titulo
+import os
+import zipfile
+import io
+from datetime import datetime
+from functions import adicionarItem, orcamento, banco, gerar_pdf, mudar_titulo, init_state
 
 st.markdown(
     """
@@ -35,144 +39,267 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ===== Carregando os dados =====
-dfBanco = pd.read_csv("dataBase/banco.csv", sep=";", decimal=",")
-dfEstudo = pd.read_csv("dataBase/estudo.csv", sep=";", decimal=",")
-dfBudget = pd.read_csv("dataBase/budget.csv", sep=";", decimal=",")
-dfTitulo = pd.read_csv("dataBase/nomeEstudo.csv", sep=";")
-titulo = dfTitulo["NOME DO ESTUDO"].to_list()
-listaProjetos = dfEstudo["PROJETO"].dropna().sort_values().unique()
-listaItem = dfBanco["ITEM"].dropna().unique()
 
-dfEstudo["VALOR TOTAL"] = dfEstudo["VALOR UN."] * dfEstudo["QTD."]
+tab1, tab2, tab3 = st.tabs([":material/database: Banco de Dados", ":material/add: Adicionar", ":material/book: Estudos"])
 
-ordem_colunas = [
-    "PROJETO",
-    "LOCALIZAÇÃO",
-    "ITEM",
-    "QTD.",
-    "VALOR UN.",
-    "VALOR TOTAL",
-    "OBS"
-]
-
-total_projeto = dfEstudo["VALOR TOTAL"].sum()
-df_budget = dfBudget[["PROJETO", "BUDGET"]]
-
-# =================================
-
-st.title(titulo[0])
-
-
-tab1, tab2 = st.tabs([":material/book: Estudos", ":material/add: Adicionar"])
 
 with tab1:
-    st.metric("Total do Projeto", f"R$ {total_projeto:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
-    with st.container(horizontal=True):
-        if st.button(":material/add: Adicionar Item", type="primary"):
-            adicionarItem(listaProjetos, listaItem, dfBanco, dfEstudo)
+    uploaded_zip = st.file_uploader("Upload ZIP", type="zip")
 
-        with st.popover(":material/box: Total por Item"):
-            total_por_item = dfEstudo.groupby("ITEM")["QTD."].sum().sort_values(ascending=False)
-            st.table(total_por_item)
-        
-        # Aqui abaixo começa a lista suspensa para filtrar o df Estudos
+    if uploaded_zip:
 
-    projetosMultiselect = st.multiselect(
-        "",
-        listaProjetos,
-        placeholder="Selecione o Projeto",
-        key="projetos_selecionados"
-    )
+        dfBanco = None
+        dfEstudo = None
+        dfBudget = None
+        dfTitulo = None
 
-    edits = {}
+        with zipfile.ZipFile(uploaded_zip) as z:
 
-    for projeto in projetosMultiselect:
-        st.markdown(f"### {projeto}")
+            for nome in z.namelist():
+                base = os.path.basename(nome)
 
-        df_view = dfEstudo[dfEstudo["PROJETO"] == projeto][ordem_colunas]
-        df_view_budget = df_budget[df_budget["PROJETO"] == projeto].to_dict(orient="list")
-        budget_valor = df_view_budget["BUDGET"][0]
-        budget_valor = float(budget_valor)
-        
-        
+                st.markdown(base)
 
-        edits[projeto] = st.data_editor(
-            df_view,
-            num_rows="delete",
-            key=f"editor_{projeto}",
-            disabled=["", "VALOR TOTAL", "VALOR UN."],
-                                column_config={
+                if base == "banco.csv":
+                    with z.open(nome) as f:
+                        dfBanco = pd.read_csv(f, sep=";", decimal=",")
+
+                elif base == "estudo.csv":
+                    with z.open(nome) as f:
+                        dfEstudo = pd.read_csv(f, sep=";", decimal=",")
+
+                elif base == "budget.csv":
+                    with z.open(nome) as f:
+                        dfBudget = pd.read_csv(f, sep=";", decimal=",")
+
+                elif base == "nomeEstudo.csv":
+                    with z.open(nome) as f:
+                        dfTitulo = pd.read_csv(f, sep=";")
+
+        # ✅ Só inicializa se tudo foi carregado
+        if all(v is not None for v in [dfBanco, dfEstudo, dfBudget, dfTitulo]):
+            init_state(dfBanco, dfEstudo, dfBudget, dfTitulo)
+            st.success("Dados carregados no session_state")
+        else:
+            st.error("ZIP incompleto — faltam arquivos")
+
+        with st.popover("Session State"):
+            st.write(st.session_state)
+
+    if uploaded_zip != None:
+
+        with tab2:
+
+            st.title(st.session_state.dfTitulo.loc[0, "NOME DO ESTUDO"])
+
+            titulo = st.session_state.dfTitulo["NOME DO ESTUDO"].to_list()
+            listaProjetos = st.session_state.dfEstudo["PROJETO"].dropna().sort_values().unique()
+            listaItem = st.session_state.dfBanco["ITEM"].dropna().unique()
+
+            dfEstudo["VALOR TOTAL"] = dfEstudo["VALOR UN."] * dfEstudo["QTD."]
+
+            ordem_colunas = [
+                "PROJETO",
+                "LOCALIZAÇÃO",
+                "ITEM",
+                "QTD.",
+                "VALOR UN.",
+                "VALOR TOTAL",
+                "OBS"
+            ]
+
+            total_projeto = dfEstudo["VALOR TOTAL"].sum()
+            df_budget = dfBudget[["PROJETO", "BUDGET"]]
+
+            # =================================
+
+
+            st.markdown("### Ações:")
+
+            pdf_bytes = None
+
+            with st.container(horizontal=True, border=True):
+                if st.button(":material/settings: Configuração"):
+                    mudar_titulo(titulo, dfTitulo)
+                if st.button(":material/payments: Orçamento"):
+                    orcamento()
+                if st.button(":material/database: Banco"):
+                    banco()
+
+                zip_buffer = io.BytesIO()
+
+                with zipfile.ZipFile(zip_buffer, "w") as z:
+
+                    z.writestr(
+                        "banco.csv",
+                        st.session_state.dfBanco.to_csv(sep=";", decimal=",", index=False)
+                    )
+
+                    z.writestr(
+                        "estudo.csv",
+                        st.session_state.dfEstudo.to_csv(sep=";", decimal=",", index=False)
+                    )
+
+                    z.writestr(
+                        "budget.csv",
+                        st.session_state.dfBudget.to_csv(sep=";", decimal=",", index=False)
+                    )
+
+                    z.writestr(
+                        "nomeEstudo.csv",
+                        st.session_state.dfTitulo.to_csv(sep=";", index=False)
+                    )
+
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                nome_zip = f"dados_{timestamp}.zip"
+
+                st.download_button(
+                    ":material/backup: Baixar tudo (ZIP)",
+                    zip_buffer.getvalue(),
+                    nome_zip,
+                    "application/zip"
+                )
+
+                if st.button(":material/picture_as_pdf: Gerar PDF", type="primary"):
+
+                    pdf_bytes = gerar_pdf()
+
+                    st.download_button(
+                    label=":material/download: Baixar PDF",
+                    data=pdf_bytes,
+                    file_name="relatorio.pdf",
+                    mime="application/pdf",
+                    type="primary"
+                    )
+                
+                if pdf_bytes is not None:
+                    st.pdf(pdf_bytes)
+                
+
+
+        with tab3:
+
+            # 🔹 Sempre iniciar estado
+            #init_state(dfBanco, dfEstudo, dfBudget, dfTitulo)
+
+            st.title(st.session_state.dfTitulo.loc[0, "NOME DO ESTUDO"])
+
+            # 🔹 Usar SOMENTE session_state daqui pra frente
+            dfEstudo = st.session_state.dfEstudo
+            dfBudget = st.session_state.dfBudget
+
+            dfEstudo["VALOR TOTAL"] = dfEstudo["VALOR UN."] * dfEstudo["QTD."]
+
+            listaProjetos = dfEstudo["PROJETO"].dropna().sort_values().unique()
+
+            ordem_colunas = [
+                "PROJETO",
+                "LOCALIZAÇÃO",
+                "ITEM",
+                "QTD.",
+                "VALOR UN.",
+                "VALOR TOTAL",
+                "OBS"
+            ]
+
+            total_global = dfEstudo["VALOR TOTAL"].sum()
+
+            st.metric(
+                "Total do Projeto",
+                f"R$ {total_global:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
+
+            # =====================================================
+            # AÇÕES
+            # =====================================================
+
+            with st.container(horizontal=True):
+
+                if st.button(":material/add: Adicionar Item", type="primary"):
+                    listaItem = st.session_state.dfBanco["ITEM"].dropna().unique()
+                    adicionarItem(listaProjetos, listaItem,
+                                st.session_state.dfBanco,
+                                st.session_state.dfEstudo)
+
+                with st.popover(":material/box: Total por Item"):
+                    total_por_item = (
+                        dfEstudo.groupby("ITEM")["QTD."]
+                        .sum()
+                        .sort_values(ascending=False)
+                    )
+                    st.table(total_por_item)
+
+            # =====================================================
+            # FILTRO PROJETOS
+            # =====================================================
+
+            projetosMultiselect = st.multiselect(
+                "",
+                listaProjetos,
+                placeholder="Selecione o Projeto",
+                key="projetos_selecionados"
+            )
+
+            edits = {}
+
+            for projeto in projetosMultiselect:
+
+                st.markdown(f"### {projeto}")
+
+                df_view = dfEstudo[dfEstudo["PROJETO"] == projeto][ordem_colunas].copy()
+
+                budget_valor = float(
+                    dfBudget.loc[dfBudget["PROJETO"] == projeto, "BUDGET"].iloc[0]
+                )
+
+                edits[projeto] = st.data_editor(
+                    df_view,
+                    num_rows="delete",
+                    key=f"editor_{projeto}",
+                    disabled=["VALOR TOTAL", "VALOR UN."],
+                    column_config={
                         "VALOR UN.": st.column_config.NumberColumn(
-                            "VALOR UN.",
-                            format="R$ %.2f",
+                            "VALOR UN.", format="R$ %.2f"
                         ),
                         "VALOR TOTAL": st.column_config.NumberColumn(
-                            "VALOR TOTAL",
-                            format="R$ %.2f",
+                            "VALOR TOTAL", format="R$ %.2f"
                         ),
                     },
-        )
+                )
 
-        total_projeto = df_view["VALOR TOTAL"].sum()
-        st.markdown(f"📊 **TOTAL:** R$ {total_projeto: .2f}".replace(".",","))
-        st.markdown(f"💵 **BUDGET:** R$ {budget_valor: .2f}".replace(".",","))
-        if budget_valor - total_projeto < 0:
-            st.markdown(f"❌ **OVER:** :red[R$ {budget_valor - total_projeto: .2f}]".replace(".",","))
-        else:
-            st.markdown(f"💰 **SAVE:** :green[R$ {budget_valor - total_projeto: .2f}]".replace(".",","))
-        st.markdown("---")
+                total_projeto = df_view["VALOR TOTAL"].sum()
 
+                st.markdown(f"📊 **TOTAL:** R$ {total_projeto:.2f}".replace(".", ","))
+                st.markdown(f"💵 **BUDGET:** R$ {budget_valor:.2f}".replace(".", ","))
 
-    if len(projetosMultiselect) is not 0:
-        if st.button(":material/save: Salvar Alterações", type="primary"):
+                diff = budget_valor - total_projeto
 
-            df_final = dfEstudo.copy()
+                if diff < 0:
+                    st.markdown(f"❌ **OVER:** :red[R$ {diff:.2f}]".replace(".", ","))
+                else:
+                    st.markdown(f"💰 **SAVE:** :green[R$ {diff:.2f}]".replace(".", ","))
 
-            for projeto, df_editado in edits.items():
+                st.markdown("---")
 
-                # Remove todas as linhas antigas do projeto
-                df_final = df_final[df_final["PROJETO"] != projeto]
+            # =====================================================
+            # SALVAR ALTERAÇÕES
+            # =====================================================
 
-                # Adiciona as novas (já com deletes aplicados)
-                df_final = pd.concat([df_final, df_editado], ignore_index=True)
+            if projetosMultiselect:
 
-            df_final.to_csv(
-                "dataBase/estudo.csv",
-                sep=";",
-                decimal=",",
-                index=False
-            )
+                if st.button(":material/save: Salvar Alterações", type="primary"):
 
-            st.toast("Alterações salvas!", icon=":material/check:")
-            st.rerun()
+                    df_final = dfEstudo.copy()
 
-with tab2:
-    st.markdown("### Ações:")
+                    for projeto, df_editado in edits.items():
 
-    pdf_bytes = None
+                        df_final = df_final[df_final["PROJETO"] != projeto]
+                        df_final = pd.concat([df_final, df_editado], ignore_index=True)
 
-    with st.container(horizontal=True, border=True):
-        if st.button(":material/settings: Configuração"):
-            mudar_titulo(titulo, dfTitulo)
-        if st.button(":material/payments: Orçamento"):
-            orcamento(df_budget, dfBudget)
-        if st.button(":material/database: Banco"):
-            banco(dfBanco)
+                    # 🔹 Atualiza session_state
+                    st.session_state.dfEstudo = df_final
 
-        if st.button(":material/picture_as_pdf: Gerar PDF", type="primary"):
-
-            pdf_bytes = gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget)
-
-            st.download_button(
-            label=":material/download: Baixar PDF",
-            data=pdf_bytes,
-            file_name="relatorio.pdf",
-            mime="application/pdf",
-            type="primary"
-            )
-        
-    if pdf_bytes is not None:
-        st.pdf(pdf_bytes)
+                    st.toast("Alterações salvas!", icon=":material/check:")
+                    st.rerun()
 

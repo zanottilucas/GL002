@@ -23,39 +23,73 @@ import matplotlib
 import matplotlib as mpl
 
 
+def init_state(dfBanco, dfEstudo, dfBudget, dfTitulo):
+
+    if "dfBanco" not in st.session_state:
+        st.session_state.dfBanco = dfBanco.copy()
+
+    if "dfEstudo" not in st.session_state:
+        st.session_state.dfEstudo = dfEstudo.copy()
+
+    if "dfBudget" not in st.session_state:
+        st.session_state.dfBudget = dfBudget.copy()
+
+    if "dfTitulo" not in st.session_state:
+        st.session_state.dfTitulo = dfTitulo.copy()
+
+
+
+
 @st.dialog(":material/payments: Orçamento")
-def orcamento(df_budget, dfBudget):
-    for x, y in df_budget.values:
+def orcamento():
+
+    df_budget = st.session_state.dfBudget
+
+    # ---------- Inicializa chaves ----------
+    for _, row in df_budget.iterrows():
+        key = f"budget_{row['PROJETO']}"
+        if key not in st.session_state:
+            st.session_state[key] = float(row["BUDGET"])
+
+    # ---------- Inputs ----------
+    for _, row in df_budget.iterrows():
+        projeto = row["PROJETO"]
+
         st.number_input(
-            label=f"Orçamento para o projeto {x}",
-            key=f"budget_{x}",
-            value=float(y),
+            label=f"Orçamento para o projeto {projeto}",
+            key=f"budget_{projeto}",
             min_value=0.00,
         )
 
+    # ---------- Salvar ----------
     if st.button("💾 Salvar orçamentos"):
-        # Atualiza o dataframe com os valores do session_state
+
         for idx, row in df_budget.iterrows():
             projeto = row["PROJETO"]
-            df_budget.loc[idx, "BUDGET"] = st.session_state.get(
-                f"budget_{projeto}", row["BUDGET"]
-            )
+            df_budget.loc[idx, "BUDGET"] = st.session_state[f"budget_{projeto}"]
 
-        # Atualiza o dataframe original
-        dfBudget.update(df_budget)
-
-        # Salva no CSV
-        dfBudget.to_csv("dataBase/budget.csv", sep=";", index=False)
+        st.session_state.dfBudget = df_budget
 
         st.success("Orçamentos salvos com sucesso!")
+        st.rerun()
 
 @st.dialog(":material/database: Banco", width="large")
-def banco(dfBanco):
-    dfEditado = st.data_editor(dfBanco, width="stretch", num_rows="dynamic")
+def banco():
+
+    dfEditado = st.data_editor(
+        st.session_state.dfBanco,
+        width="stretch",
+        num_rows="dynamic",
+        key="editor_banco"
+    )
+
     if st.button("💾 Salvar dados"):
-        # dfBanco.update(dfEditado)
-        dfEditado.to_csv("dataBase/banco.csv", sep=";", decimal=",", index=False)
+
+        # ⭐ Atualiza o session_state
+        st.session_state.dfBanco = dfEditado.copy()
+
         st.success("Salvo com sucesso!")
+        st.rerun()
     
 @st.dialog(":material/add: Adicionar Item", width="large")
 def adicionarItem(listaProjetos, listaItem, dfBanco, dfEstudo):
@@ -98,7 +132,7 @@ def primeira_pagina(canvas, doc):
     w, h = A4
 
     dfTitulo = pd.read_csv("dataBase/nomeEstudo.csv", sep=";")
-    titulo = dfTitulo["NOME DO ESTUDO"].to_list()
+    titulo = st.session_state.dfTitulo["NOME DO ESTUDO"].to_list()
 
     data = datetime.now()
     formatada = format_date(data, "d 'de' MMMM 'de' y", locale="pt_BR")
@@ -121,7 +155,21 @@ def outras_paginas(canvas, doc):
 # -----------------------------
 # GERAR PDF
 # -----------------------------
-def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
+def gerar_pdf():
+
+    dfEstudo = st.session_state.dfEstudo.copy()
+    dfBudget = st.session_state.dfBudget.copy()
+
+    dfEstudo["VALOR TOTAL"] = dfEstudo["VALOR UN."] * dfEstudo["QTD."]
+
+    listaProjetos = (
+        dfEstudo["PROJETO"]
+        .dropna()
+        .sort_values()
+        .unique()
+    )
+
+    df_budget = dfBudget[["PROJETO", "BUDGET"]]
 
     buffer = BytesIO()
 
@@ -317,11 +365,15 @@ def gerar_pdf(total_projeto, listaProjetos, dfEstudo, df_budget):
 
 @st.dialog(":material/settings: Configuração")
 def mudar_titulo(titulo, dfTitulo):
-    mudarTitulo = st.text_input("Título", placeholder= titulo[0])
+    mudarTitulo = st.text_input("Título", placeholder= titulo[0], value=st.session_state.dfTitulo.loc[0, "NOME DO ESTUDO"])
 
     if st.button(":material/refresh: Atualizar", type="primary"):
-        dfTitulo.loc[0] = mudarTitulo
-        dfTitulo.to_csv("dataBase/nomeEstudo.csv", index=False, sep=";")
-        st.rerun()
+
+        st.session_state.dfTitulo.loc[0, "NOME DO ESTUDO"] = mudarTitulo
+        
         st.success("Alteração feita com sucesso!")
+        st.rerun()
+        
+
+
 
