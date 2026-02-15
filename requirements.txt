@@ -5,3 +5,4 @@ matplotlib
 reportlab
 babel
 pillow
+streamlit[pdf]
