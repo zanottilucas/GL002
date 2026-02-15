@@ -131,7 +131,6 @@ def primeira_pagina(canvas, doc):
     capa_relatorio = "assets/capa_relatorio.png"
     w, h = A4
 
-    dfTitulo = pd.read_csv("dataBase/nomeEstudo.csv", sep=";")
     titulo = st.session_state.dfTitulo["NOME DO ESTUDO"].to_list()
 
     data = datetime.now()
