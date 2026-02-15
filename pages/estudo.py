@@ -45,6 +45,7 @@ tab1, tab2, tab3 = st.tabs([":material/database: Banco de Dados", ":material/add
 
 with tab1:
 
+    st.badge("Ao alterar o upload de .zip, é necessário dar F5 para limpar o cache do antigo .zip", color="yellow", icon=":material/warning:")
     uploaded_zip = st.file_uploader("Upload ZIP", type="zip")
 
     if uploaded_zip:
