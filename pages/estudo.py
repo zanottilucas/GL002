@@ -219,9 +219,7 @@ with tab1:
 
                 if st.button(":material/add: Adicionar Item", type="primary"):
                     listaItem = st.session_state.dfBanco["ITEM"].dropna().unique()
-                    adicionarItem(listaProjetos, listaItem,
-                                st.session_state.dfBanco,
-                                st.session_state.dfEstudo)
+                    adicionarItem(listaProjetos, listaItem)
 
                 with st.popover(":material/box: Total por Item"):
                     total_por_item = (
