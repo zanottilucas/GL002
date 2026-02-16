@@ -118,6 +118,11 @@ with tab1:
 
             st.markdown("### Ações:")
 
+            listaColunas_pdf = st.pills("Selecione as colunas para o PDF", 
+                                        ["LOCALIZAÇÃO", "PROJETO", "ITEM", "FORNECEDOR", "QTD.", "OBS"], selection_mode="multi", default=["LOCALIZAÇÃO", "PROJETO", "ITEM", "FORNECEDOR", "QTD."])
+
+            st.markdown(f"##### Ordem das colunas: \n :blue-background[{listaColunas_pdf}]")
+            
             pdf_bytes = None
 
             with st.container(horizontal=True, border=True):
@@ -164,7 +169,7 @@ with tab1:
 
                 if st.button(":material/picture_as_pdf: Gerar PDF", type="primary"):
 
-                    pdf_bytes = gerar_pdf()
+                    pdf_bytes = gerar_pdf(listaColunas_pdf)
 
                     st.download_button(
                     label=":material/download: Baixar PDF",
@@ -198,6 +203,7 @@ with tab1:
                 "PROJETO",
                 "LOCALIZAÇÃO",
                 "ITEM",
+                "FORNECEDOR",
                 "QTD.",
                 "VALOR UN.",
                 "VALOR TOTAL",

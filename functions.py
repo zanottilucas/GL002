@@ -187,7 +187,7 @@ def outras_paginas(canvas, doc):
 # -----------------------------
 # GERAR PDF
 # -----------------------------
-def gerar_pdf():
+def gerar_pdf(listaColunas_pdf):
 
     dfEstudo = st.session_state.dfEstudo.copy()
     dfBudget = st.session_state.dfBudget.copy()
@@ -227,14 +227,9 @@ def gerar_pdf():
 
     #story.append(Paragraph(f"Total do projeto: R$ {total_projeto: .2f}".replace(".",","), styles["Heading1"])) --> Tem um Bug, quando tem um multiselect na outra aba, ele soma errado.
 
-    ordem_colunas = [
-    "PROJETO",
-    "LOCALIZAÇÃO",
-    "ITEM",
-    "QTD.",
-    "VALOR UN.",
-    "VALOR TOTAL"
-]
+    ordem_colunas = listaColunas_pdf
+    ordem_colunas.append("VALOR UN.")
+    ordem_colunas.append("VALOR TOTAL")
 
  
     for projeto in listaProjetos:
